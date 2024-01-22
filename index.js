@@ -389,7 +389,7 @@ function vulnerabilities2SARIFRes(data) {
           help: getSARIFVulnHelp(pkg, vuln),
           properties: {
             precision: "very-high",
-            'security-severity': vuln.cvssScore.value.score,
+            'security-severity': `${vuln.cvssScore.value.score}`,
             tags: [
                 'vulnerability',
                 'security',
@@ -677,3 +677,4 @@ module.exports = {
 if (require.main === module) {
   run();
 }
+
