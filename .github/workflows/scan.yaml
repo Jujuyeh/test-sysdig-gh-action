@@ -1,0 +1,23 @@
+name: Scan Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan-from-registry:
+    runs-on: ubuntu-latest
+
+    steps:
+      # This step checks out a copy of your repository.
+      - name: My first step - check out repository
+        uses: actions/checkout@v4
+
+      - name: Scan dummy-vuln-app from registry
+        id: scan
+        uses: ./
+        with:
+          # Tag of the image to analyse
+          image-tag: sysdiglabs/dummy-vuln-app:latest
+          # API token for Sysdig Scanning auth
+          sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
+          ignore-failed-scan: true
