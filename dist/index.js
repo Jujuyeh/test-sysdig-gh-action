@@ -373,26 +373,26 @@ function vulnerabilities2SARIFRes(data) {
   let resultUrl = data.info.resultUrl;
   let baseUrl = resultUrl.slice(0,resultUrl.lastIndexOf('/'));
 
-  data.result.packages.forEach(function (package, index) {
-    if (!package.vulns) {
-      //LOG.info(f"Package: {package.name} has no vulnerabilities...skipping...")
+  data.result.packages.forEach(function (pkg, index) {
+    if (!pkg.vulns) {
+      //LOG.info(f"Package: {pkg.name} has no vulnerabilities...skipping...")
       return
     }
 
-    package.vulns.forEach(function (vuln, index) {
+    pkg.vulns.forEach(function (vuln, index) {
       if (!(vuln.name in ruleIds)){
         ruleIds.push(vuln.name)
         rule = {
           id: vuln.name,
-          name: package.type,
+          name: pkg.type,
           shortDescription: {
-            text: getSARIFVulnShortDescription(package, vuln)
+            text: getSARIFVulnShortDescription(pkg, vuln)
           },
           fullDescription: {
-            text: getSARIFVulnFullDescription(package, vuln)
+            text: getSARIFVulnFullDescription(pkg, vuln)
           },
           helpUri: `https://nvd.nist.gov/vuln/detail/${vuln.name}`,
-          help: getSARIFVulnHelp(package, vuln),
+          help: getSARIFVulnHelp(pkg, vuln),
           properties: {
             precision: "very-high",
             'security-severity': vuln.cvssScore.value.score,
@@ -410,7 +410,7 @@ function vulnerabilities2SARIFRes(data) {
         ruleId: vuln.name,
         level: check_level(vuln.severity.value),
         message: {
-          text: getSARIFReportMessage(data, vuln, package, baseUrl)
+          text: getSARIFReportMessage(data, vuln, pkg, baseUrl)
         },
         locations: [
           {
@@ -421,7 +421,7 @@ function vulnerabilities2SARIFRes(data) {
                   }
               },
               message: {
-                  text: `${data.result.metadata.pullString} - ${package.name}@${package.version}`
+                  text: `${data.result.metadata.pullString} - ${pkg.name}@${pkg.version}`
               }
           }
         ]
@@ -505,47 +505,47 @@ function vulnerabilities2SARIFResults(tag, vulnerabilities) {
 }
 
 
-function getSARIFVulnShortDescription(package, vuln) {
-  return `${vuln.name} Severity: ${vuln.severity.value} Package: ${package.name}`;
+function getSARIFVulnShortDescription(pkg, vuln) {
+  return `${vuln.name} Severity: ${vuln.severity.value} Package: ${pkg.name}`;
 }
 
-function getSARIFVulnFullDescription(package, vuln) {
+function getSARIFVulnFullDescription(pkg, vuln) {
   return `${vuln.name}
 Severity: ${vuln.severity.value}
-Package: ${package.name}
-Type: ${package.type}
-Fix: ${package.suggestedFix || "None"}
+Package: ${pkg.name}
+Type: ${pkg.type}
+Fix: ${pkg.suggestedFix || "None"}
 URL: https://nvd.nist.gov/vuln/detail/${vuln.name}`;
 }
 
-function getSARIFVulnHelp(package, vuln) {
+function getSARIFVulnHelp(pkg, vuln) {
   return {
     text: `Vulnerability ${vuln.name}
 Severity: ${vuln.severity.value}
-Package: ${package.name}
+Package: ${pkg.name}
 CVSS Score: ${vuln.cvssScore.value.score}
 CVSS Version: ${vuln.cvssScore.value.version}
 CVSS Vector: ${vuln.cvssScore.value.vector}
-Version: ${package.version}
-Fix Version: ${package.suggestedFix || "None"}
+Version: ${pkg.version}
+Fix Version: ${pkg.suggestedFix || "None"}
 Exploitable: ${vuln.exploitable}
-Type: ${package.type}
-Location: ${package.path}
+Type: ${pkg.type}
+Location: ${pkg.path}
 URL: https://nvd.nist.gov/vuln/detail/${vuln.name}`,
     markdown: `
 **Vulnerability [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})**
 | Severity | Package | CVSS Score | CVSS Version | CVSS Vector | Fixed Version | Exploitable |
 | -------- | ------- | ---------- | ------------ | ----------- | ------------- | ----------- |
-| ${vuln.severity.value} | ${package.name} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${package.suggestedFix || "None"} | ${vuln.exploitable} |`
+| ${vuln.severity.value} | ${pkg.name} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${pkg.suggestedFix || "None"} | ${vuln.exploitable} |`
   }
 }
 
-function getSARIFReportMessage(data, vuln, package, baseUrl) {
+function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
   return `Full image scan results in Sysdig UI: [${data.result.metadata.pullString} scan result](${data.info.resultUrl})
-  Package: [${package.name}](${baseUrl}/content?filter=freeText+in+(${package.name}\))
-  Package type: ${package.type}
-  Installed Version: ${package.version}
-  Package path: ${package.path}
+  Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+(${pkg.name}\))
+  Package type: ${pkg.type}
+  Installed Version: ${pkg.version}
+  Package path: ${pkg.path}
   Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+(${vuln.name}\))
   Severity: ${vuln.severity.value}
   CVSS Score: ${vuln.cvssScore.value.score}
@@ -653,7 +653,7 @@ function getReportAnnotations(evaluationResults, vulnerabilities) {
   let uniqueReportByPackage = core.getInput('unique-report-by-package') === 'true' || false;
   let _vulns = vulnerabilities
   if(uniqueReportByPackage) {
-    const key = 'package'; // Show only one issue by package, avoiding flood of annotations
+    const key = 'package'; // Show only one issue by pkg, avoiding flood of annotations
     let _sortedVulns = _vulns.sort((a, b) => severities[b.severity.toLowerCase()] - severities[a.severity.toLowerCase()]);
     _vulns = [...new Map(_sortedVulns.map(item => [item[key], item])).values()];
   }
