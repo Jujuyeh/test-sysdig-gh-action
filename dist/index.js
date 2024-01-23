@@ -517,23 +517,32 @@ async function generateChecks(tag, scanResult, data) {
   }
 }
 
-function getRuleMessage(rule, packages) {
-
+function getRulePkgMessage(rule, packages) {
   let table = `
 | Severity | Package | CVSS Score | CVSS Version | CVSS Vector | Fixed Version | Exploitable |
 | -------- | ------- | ---------- | ------------ | ----------- | ------------- | ----------- |
 `
 
-  for (const failure in rule.failures) {
+  rule.failures.forEach(failure => {
     let pkgIndex = failure.pkgIndex;
     let vulnInPkgIndex = failure.vulnInPkgIndex;
 
     let pkg = packages[pkgIndex];
     let vuln = pkg.vulns[vulnInPkgIndex];
     table += `\n| ${vuln.severity.value} | ${pkg.name} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${pkg.suggestedFix || "None"} | ${vuln.exploitable} |`
-  }
+  });
 
   return table;
+}
+
+function getRuleImageMessage(rule) {
+  let message = ""
+
+  rule.failures.forEach(failure => {
+    message += `${failure.remediation}\n`
+  });
+
+  return message;
 }
 
 function getReportAnnotations(data) {
@@ -550,7 +559,7 @@ function getReportAnnotations(data) {
             start_line: 1,
             end_line: 1,
             annotation_level: "error",
-            message: getRuleMessage(rule, packages),
+            message: rule.failureType == "pkgVulnFailure" ? getRulePkgMessage(rule, packages) : getRuleImageMessage(rule),
             title: `${rule.description}`
           });
         }
