@@ -552,7 +552,7 @@ function getReportAnnotations(data) {
             path: "Dockerfile",
             start_line: 1,
             end_line: 1,
-            annotation_level: "error",
+            annotation_level: "failure",
             message: rule.failureType == "pkgVulnFailure" ? getRulePkgMessage(rule, packages) : getRuleImageMessage(rule),
             title: `${rule.description}`
           });
