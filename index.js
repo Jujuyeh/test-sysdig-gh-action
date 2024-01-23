@@ -478,7 +478,7 @@ async function generateSummary(tag, scanResult, data) {
 
   core.summary
   .addHeading('Scan Results')
-  .addRaw(`Policies evaluation **${data.result.policyEvaluationsResult}**`);
+  .addRaw(`Policies evaluation: ${data.result.policyEvaluationsResult} ${EVALUATION[data.result.policyEvaluationsResult]}`);
   
   addReportToSummary(data)
 
@@ -569,14 +569,14 @@ function addReportToSummary(data) {
   let packages = data.result.packages;
 
   policyEvaluations.forEach(policy => {
-    core.summary.addHeading(`${EVALUATION[policy.evaluationResult]} ${policy.name}`,2)
+    core.summary.addHeading(`${EVALUATION[policy.evaluationResult]} Policy: ${policy.name}`,2)
 
     if (policy.evaluationResult != "passed") {
       policy.bundles.forEach(bundle => {
-        core.summary.addHeading(`${bundle.name}`,3)
+        core.summary.addHeading(`Rule Bundle: ${bundle.name}`,3)
 
         bundle.rules.forEach(rule => {
-          core.summary.addHeading(`${EVALUATION[rule.evaluationResult]} ${rule.description}`,4)
+          core.summary.addHeading(`${EVALUATION[rule.evaluationResult]} Rule: ${rule.description}`,5)
 
           if (rule.evaluationResult != "passed") {
             if (rule.failureType == "pkgVulnFailure") {
@@ -585,6 +585,7 @@ function addReportToSummary(data) {
               getRuleImageMessage(rule)
             }
           }
+          core.summary.addBreak()
         });
       });
     }
