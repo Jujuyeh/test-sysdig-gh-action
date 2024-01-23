@@ -24,6 +24,11 @@ const LEVELS = {
   "note": ["Negligible","Low"]
 }
 
+const EVALUATION = {
+  "failed": "❌",
+  "passed": "✅" 
+}
+
 class ExecutionError extends Error {
   constructor(stdout, stderr) {
     super("execution error\n\nstdout: " + stdout + "\n\nstderr: " + stderr);
@@ -201,7 +206,7 @@ async function processScanResult(result) {
     }
 
     generateSARIFReport(report);
-    await generateChecks(tag, scanResult, report);
+    await generateSummary(tag, scanResult, report);
   }
 
   return result.ReturnCode == 0;
@@ -452,70 +457,83 @@ function generateSARIFReport(data) {
   fs.writeFileSync("./sarif.json", JSON.stringify(sarifOutput, null, 2));
 }
 
-async function generateChecks(tag, scanResult, data) {
-  const githubToken = core.getInput('github-token');
-  if (!githubToken) {
-    core.warning("No github-token provided. Skipping creation of check run");
-  }
+async function generateSummary(tag, scanResult, data) {
+  // const githubToken = core.getInput('github-token');
+  // if (!githubToken) {
+  //   core.warning("No github-token provided. Skipping creation of check run");
+  // }
 
-  let octokit;
-  let annotations;
-  let check_run;
+  // let octokit;
+  // let annotations;
+  // let check_run;
 
-  try {
-    octokit = github.getOctokit(githubToken);
-    annotations = getReportAnnotations(data)
-  } catch (error) {
-    core.warning("Error creating octokit: " + error);
-    return;
-  }
+  // try {
+  //   octokit = github.getOctokit(githubToken);
+  // } catch (error) {
+  //   core.warning("Error creating octokit: " + error);
+  //   return;
+  // }
 
-  let conclusion = "success";
-  if (scanResult != "Success") {
-    conclusion = "failure";
-  }
 
-  try {
-    check_run = await octokit.rest.checks.create({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      name: `Scan results for ${tag}`,
-      head_sha: github.context.sha,
-      status: "completed",
-      conclusion:  conclusion,
-      output: {
-        title: `Inline scan results for ${tag}`,
-        summary: "Scan result is " + scanResult,
-        annotations: annotations.slice(0,50)
-      }
-    });
-  } catch (error) {
-    core.warning("Error creating check run: " + error);
-  }
 
-  try {
-    for (let i = 50; i < annotations.length; i+=50) {
-      await octokit.rest.checks.update({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        check_run_id: check_run.data.id,
-        output: {
-          title: "Inline scan results",
-          summary: "Scan result is " + scanResult,
-          annotations: annotations.slice(i, i+50)
-        }
-      });
-    }
-  } catch (error) {
-    core.warning("Error updating check run: " + error);
-  }
+  core.summary
+  .addHeading('Scan Results')
+  .addRaw(`Policies evaluation **${data.result.policyEvaluationsResult}**`);
+  
+  addReportToSummary(data)
+
+  await core.summary.write();
+
+  // let conclusion = "success";
+  // if (scanResult != "Success") {
+  //   conclusion = "failure";
+  // }
+
+  // try {
+  //   check_run = await octokit.rest.checks.create({
+  //     owner: github.context.repo.owner,
+  //     repo: github.context.repo.repo,
+  //     name: `Scan results for ${tag}`,
+  //     head_sha: github.context.sha,
+  //     status: "completed",
+  //     conclusion:  conclusion,
+  //     output: {
+  //       title: `Inline scan results for ${tag}`,
+  //       summary: "Scan result is " + scanResult,
+  //       annotations: annotations.slice(0,50)
+  //     }
+  //   });
+  // } catch (error) {
+  //   core.warning("Error creating check run: " + error);
+  // }
+
+  // try {
+  //   for (let i = 50; i < annotations.length; i+=50) {
+  //     await octokit.rest.checks.update({
+  //       owner: github.context.repo.owner,
+  //       repo: github.context.repo.repo,
+  //       check_run_id: check_run.data.id,
+  //       output: {
+  //         title: "Inline scan results",
+  //         summary: "Scan result is " + scanResult,
+  //         annotations: annotations.slice(i, i+50)
+  //       }
+  //     });
+  //   }
+  // } catch (error) {
+  //   core.warning("Error updating check run: " + error);
+  // }
 }
 
 function getRulePkgMessage(rule, packages) {
-  let table = `
-| Severity | Package | CVSS Score | CVSS Version | CVSS Vector | Fixed Version | Exploitable |
-| -------- | ------- | ---------- | ------------ | ----------- | ------------- | ----------- |
-`
+  let table = [[ 
+    {data: 'Severity', header: true},
+    {data: 'Package', header: true},
+    {data: 'CVSS Score', header: true},
+    {data: 'CVSS Version', header: true},
+    {data: 'CVSS Vector', header: true},
+    {data: 'Fixed Version', header: true},
+    {data: 'Exploitable', header: true}]];
 
   rule.failures.forEach(failure => {
     let pkgIndex = failure.pkgIndex;
@@ -523,44 +541,54 @@ function getRulePkgMessage(rule, packages) {
 
     let pkg = packages[pkgIndex];
     let vuln = pkg.vulns[vulnInPkgIndex];
-    table += `\n| ${vuln.severity.value} | ${pkg.name} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${pkg.suggestedFix || "None"} | ${vuln.exploitable} |`
+    table.push([`${vuln.severity.value}`,
+      `${pkg.name}`,
+      `${vuln.cvssScore.value.score}`,
+      `${vuln.cvssScore.value.version}`,
+      `${vuln.cvssScore.value.vector}`,
+      `${pkg.suggestedFix || "None"}`,
+      `${vuln.exploitable}`
+    ]);
   });
 
-  return table;
+  core.summary.addTable(table);
 }
 
 function getRuleImageMessage(rule) {
-  let message = ""
+  let message = [];
 
   rule.failures.forEach(failure => {
-    message += `${failure.remediation}\n`
+    message.push(`${failure.remediation}`)
   });
 
-  return message;
+  core.summary.addList(message);
 }
 
-function getReportAnnotations(data) {
+function addReportToSummary(data) {
   let policyEvaluations = data.result.policyEvaluations;
   let packages = data.result.packages;
-  let gates = [];
 
   policyEvaluations.forEach(policy => {
-    policy.bundles.forEach(bundle => {
-      bundle.rules.forEach(rule => {
-        if (rule.evaluationResult != "passed") {
-          gates.push({
-            path: "Dockerfile",
-            start_line: 1,
-            end_line: 1,
-            annotation_level: "failure",
-            message: rule.failureType == "pkgVulnFailure" ? getRulePkgMessage(rule, packages) : getRuleImageMessage(rule),
-            title: `${rule.description}`
-          });
-        }
+    core.summary.addHeading(`${EVALUATION[policy.evaluationResult]} ${policy.name}`,2)
+
+    if (policy.evaluationResult != "passed") {
+      policy.bundles.forEach(bundle => {
+        core.summary.addHeading(`${bundle.name}`,3)
+
+        bundle.rules.forEach(rule => {
+          core.summary.addHeading(`${EVALUATION[rule.evaluationResult]} ${rule.description}`,4)
+
+          if (rule.evaluationResult != "passed") {
+            if (rule.failureType == "pkgVulnFailure") {
+              getRulePkgMessage(rule, packages)
+            } else {
+              getRuleImageMessage(rule)
+            }
+          }
+        });
       });
-    });
+    }
   });
-  return gates;
 }
 
 module.exports = {
