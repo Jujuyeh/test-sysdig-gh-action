@@ -523,7 +523,7 @@ function getRuleMessage(rule, packages) {
     let vulnInPkgIndex = failure.vulnInPkgIndex;
 
     let pkg = packages[pkgIndex];
-    let vuln = pkg.vuln[vulnInPkgIndex];
+    let vuln = pkg.vulns[vulnInPkgIndex];
     table += `\n| ${vuln.severity.value} | ${pkg.name} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${pkg.suggestedFix || "None"} | ${vuln.exploitable} |`
   }
 
