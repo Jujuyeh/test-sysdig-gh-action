@@ -487,14 +487,8 @@ function generateSARIFReport(data) {
 
 async function generateSummary(standalone, pullString, data) {
 
-  let imageName = data.result.metadata.pullString;
-  
-  if (pullString) {
-    imageName += ` (${pullString})`;
-  }
-
   core.summary.emptyBuffer().clear();
-  core.summary.addHeading(`Scan Results for ${imageName}`);
+  core.summary.addHeading(`Scan Results for ${pullString}`);
   
   addVulnTableToSummary(data);
 
