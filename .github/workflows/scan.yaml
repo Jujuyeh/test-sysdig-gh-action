@@ -60,6 +60,7 @@ jobs:
           sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
           stop-on-failed-policy-eval: true
           stop-on-processing-error: true
+          override-pullstring: my-cool-image
 
       - name: Upload SARIF file
         if: success() || failure() # Upload results regardless previous step fails

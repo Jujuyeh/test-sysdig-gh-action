@@ -482,7 +482,7 @@ async function generateSummary(standalone, pullString, data) {
     imageName += ` (${pullString})`;
   }
 
-  core.summary.emptyBuffer();
+  core.summary.clear();
   core.summary.addHeading(`Scan Results for ${imageName}`);
   
   addVulnTableToSummary(data);
