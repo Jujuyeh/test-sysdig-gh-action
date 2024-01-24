@@ -20,7 +20,8 @@ jobs:
           image-tag: sysdiglabs/dummy-vuln-app:latest
           # API token for Sysdig Scanning auth
           sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
-          ignore-failed-scan: true
+          stop-on-failed-policy-eval: true
+          stop-on-processing-error: true
 
       - name: Upload SARIF file
         if: success() || failure() # Upload results regardless previous step fails

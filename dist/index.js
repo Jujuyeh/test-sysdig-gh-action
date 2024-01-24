@@ -45,24 +45,20 @@ class ExecutionError extends Error {
 
 function parseActionInputs() {
   return {
-    cliScannerURL: core.getInput('cli-scanner-url') || cliScannerURL, // @TBA
+    cliScannerURL: core.getInput('cli-scanner-url') || cliScannerURL,
     registryUser: core.getInput('registry-user'),
     registryPassword: core.getInput('registry-password'),
-
-    // Legacy Inputs vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+    stopOnFailedPolicyEval: core.getInput('stop-on-failed-policy-eval') == 'true',
+    stopOnProcessingError: core.getInput('stop-on-processing-error') == 'true',
+    dbPath: core.getInput('db-path'),
+    skipUpload: core.getInput('skip-upload') == 'true',
+    usePolicies: core.getInput('use-policies'),
+    overridePullString: core.getInput('override-pullstring'),
     imageTag: core.getInput('image-tag', { required: true }),
     sysdigSecureToken: core.getInput('sysdig-secure-token', { required: true }),
     sysdigSecureURL: core.getInput('sysdig-secure-url') || defaultSecureEndpoint,
     sysdigSkipTLS: core.getInput('sysdig-skip-tls') == 'true',
-    // dockerfilePath: core.getInput('dockerfile-path'),
-    ignoreFailedScan: core.getInput('ignore-failed-scan') == 'true',
-    // inputType: core.getInput('input-type'),
-    // inputPath: core.getInput('input-path'),
-    //runAsUser: core.getInput('run-as-user'),
     extraParameters: core.getInput('extra-parameters'),
-
-    // extraDockerParameters: core.getInput('extra-docker-parameters'),
-    // inlineScanImage: core.getInput('inline-scan-image'),
   }
 }
 
@@ -72,29 +68,33 @@ function printOptions(opts) {
     core.info('Sysdig Secure URL: ' + opts.sysdigSecureURL);
   }
 
-  // if (opts.inputType == "pull") {
-  //   core.info('Input type: pull from registry');
-  // } else {
-  //   core.info(`Input type: ${opts.inputType}`);
-  // }
-
-  // if (opts.inputPath) {
-  //   core.info(`Input path: ${opts.inputPath}`);
-  // }
-
-  // if (opts.dockerfilePath) {
-  //   core.info(`Dockerfile Path: ${opts.dockerfilePath}`);
-  // }
-
-  if (opts.sysdigSkipTLS) {
-    core.info(`Sysdig skip TLS: true`);
+  if (opts.registryUser && opts.registryPassword) {
+    core.info(`Using specified Registry credentials.`);
   }
+
+  core.info(`Stop on Failed Policy Evaluation: ${opts.stopOnFailedPolicyEval}`);
+
+  core.info(`Stop on Processing Error: ${opts.stopOnProcessingError}`);
+
+  if (opts.skipUpload) {
+    core.info(`Skipping scan results upload to Sysdig Secure...`);
+  }
+
+  if (opts.dbPath) {
+    core.info(`DB Path: ${opts.dbPath}`);
+  }
+
+  core.info(`Sysdig skip TLS: ${opts.sysdigSkipTLS}`);
 
   if (opts.severity) {
     core.info(`Severity level: ${opts.severity}`);
   }
 
   core.info('Analyzing image: ' + opts.imageTag);
+
+  if (opts.overridePullString) {
+    core.info(` * Image PullString will be overwritten as ${opts.overridePullString}`);
+  }
 }
 
 function composeFlags(opts) {
@@ -115,25 +115,24 @@ function composeFlags(opts) {
     flags += ` --apiurl ${opts.sysdigSecureURL}`;
   }
 
-  // if (opts.inputType != "pull") {
-  //   flags += ` --storage-type=${opts.inputType}`;
+  if (opts.dbPath) {
+    flags += ` --dbpath=${opts.dbPath}`;
+  }
 
-  //   if (opts.inputType == "docker-daemon") {
-  //     let dockerSocketPath = opts.inputPath || "/var/run/docker.sock";
-  //     dockerFlags += ` -v ${dockerSocketPath}:/var/run/docker.sock`;
-  //   } else if (opts.inputPath) {
-  //     let filename = path.basename(opts.inputPath);
-  //     dockerFlags += ` -v ${path.resolve(opts.inputPath)}:/tmp/${filename}`;
-  //     flags += ` --storage-path=/tmp/${filename}`;
-  //   }
-  // }
+  if (opts.skipUpload) {
+    flags += ' --skipupload';
+  }
 
-  // if (opts.dockerfilePath) {
-  //   flags += ` --dockerfile=/tmp/Dockerfile`;
-  // }
+  if (opts.usePolicies) {
+    flags += ` --policy=${opts.usePolicies}`;
+  }
 
   if (opts.sysdigSkipTLS) {
     flags += ` --skiptlsverify`;
+  }
+
+  if (opts.overridePullString) {
+    flags += ` --override-pullstring=${opts.overridePullString}`;
   }
 
   if (opts.extraParameters) {
@@ -156,27 +155,34 @@ function writeReport(reportData) {
 async function run() {
 
   try {
-
     let opts = parseActionInputs();
     printOptions(opts);
     let scanFlags = composeFlags(opts);
 
     await pullScanner(opts.cliScannerURL);
     let scanResult = await executeScan(scanFlags.envvars, scanFlags.flags);
-    // exit(0);  // <-- Implemented 'til here
 
-    let success = await processScanResult(scanResult);
-    if (!(success || opts.ignoreFailedScan)) {
-      core.setFailed(`Scan was FAILED.`)
+    if (scanResult.ReturnCode == 0 || scanResult.ReturnCode == 1) {
+      await processScanResult(scanResult, opts);
     }
 
+    if (opts.stopOnFailedPolicyEval && scanResult.ReturnCode == 1) {
+      core.setFailed(`Stopping because Policy Evaluation was FAILED.`);
+    } else if (scanResult.ReturnCode == 0) {
+      core.info("Policy Evaluation was PASSED.");
+    } else if (opts.stopOnProcessingError) {
+      core.setFailed(`Stopping because the scanner terminated with an error.`);
+    } // else: Don't stop regardless the outcome.
+
   } catch (error) {
-    core.setFailed("Unexpected error");
+    if (core.getInput('stop-on-processing-error') == 'true') {
+      core.setFailed("Unexpected error");
+    }
     core.error(error);
   }
 }
 
-async function processScanResult(result) {
+async function processScanResult(result, opts) {
   let scanResult;
   if (result.ReturnCode == 0) {
     scanResult = "Success";
@@ -214,8 +220,6 @@ async function processScanResult(result) {
     generateSARIFReport(report);
     await generateSummary(tag, scanResult, report);
   }
-
-  return result.ReturnCode == 0;
 }
 
 async function pullScanner(scannerURL) {
@@ -268,9 +272,10 @@ async function executeScan(envvars, flags) {
   let retCode = await exec.exec(cmd, null, scanOptions);
   core.info("Image analysis took " + Math.round(performance.now() - start) + " milliseconds.");
 
-  cmd = `cat ./${cliScannerResult}`;
-  await exec.exec(cmd, null, catOptions);
-
+  if (retCode == 0 || retCode == 1) {
+    cmd = `cat ./${cliScannerResult}`;
+    await exec.exec(cmd, null, catOptions);
+  }
   return { ReturnCode: retCode, Output: execOutput, Error: errOutput };
 }
 
@@ -307,8 +312,8 @@ function vulnerabilities2SARIF(data) {
       os: data.result.metadata.os,
       size: data.result.metadata.size,
       layersCount: data.result.metadata.layersCount,
-      resultUrl: data.info.resultUrl,
-      resultId: data.info.resultId,
+      resultUrl: data.info.resultUrl || "",
+      resultId: data.info.resultId || "",
   }
   }];
 
@@ -335,15 +340,19 @@ function check_level(sev_value) {
 }
 
 function vulnerabilities2SARIFRes(data) {
-  let results = []
-  let rules = []
-  let ruleIds = []
-  let resultUrl = data.info.resultUrl;
-  let baseUrl = resultUrl.slice(0,resultUrl.lastIndexOf('/'));
+  let results = [];
+  let rules = [];
+  let ruleIds = [];
+  let resultUrl = "";
+  let baseUrl = null;
+  
+  if (data.info.resultUrl) {
+    resultUrl = data.info.resultUrl;
+    baseUrl = resultUrl.slice(0,resultUrl.lastIndexOf('/'));
+  }
 
   data.result.packages.forEach(function (pkg, index) {
     if (!pkg.vulns) {
-      //LOG.info(f"Package: {pkg.name} has no vulnerabilities...skipping...")
       return
     }
 
@@ -410,7 +419,7 @@ function getSARIFVulnFullDescription(pkg, vuln) {
 Severity: ${vuln.severity.value}
 Package: ${pkg.name}
 Type: ${pkg.type}
-Fix: ${pkg.suggestedFix || "None"}
+Fix: ${pkg.suggestedFix || "Unknown"}
 URL: https://nvd.nist.gov/vuln/detail/${vuln.name}`;
 }
 
@@ -423,7 +432,7 @@ CVSS Score: ${vuln.cvssScore.value.score}
 CVSS Version: ${vuln.cvssScore.value.version}
 CVSS Vector: ${vuln.cvssScore.value.vector}
 Version: ${pkg.version}
-Fix Version: ${pkg.suggestedFix || "None"}
+Fix Version: ${pkg.suggestedFix || "Unknown"}
 Exploitable: ${vuln.exploitable}
 Type: ${pkg.type}
 Location: ${pkg.path}
@@ -437,19 +446,23 @@ URL: https://nvd.nist.gov/vuln/detail/${vuln.name}`,
 }
 
 function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
-  return `Full image scan results in Sysdig UI: [${data.result.metadata.pullString} scan result](${data.info.resultUrl})
-  Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+(\"${pkg.name}\"))
-  Package type: ${pkg.type}
+  let message = `Full image scan results in Sysdig UI: [${data.result.metadata.pullString} scan result](${data.info.resultUrl})`;
+
+  if (baseUrl) message += `Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+(\"${pkg.name}\"))`;
+  
+  message += `Package type: ${pkg.type}
   Installed Version: ${pkg.version}
-  Package path: ${pkg.path}
-  Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+(\"${vuln.name}\"))
-  Severity: ${vuln.severity.value}
+  Package path: ${pkg.path}`;
+
+  if (baseUrl) message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+(\"${vuln.name}\"))`;
+  
+  message += `Severity: ${vuln.severity.value}
   CVSS Score: ${vuln.cvssScore.value.score}
   CVSS Version: ${vuln.cvssScore.value.version}
   CVSS Vector: ${vuln.cvssScore.value.vector}
-  Fixed Version: ${(vuln.fixedInVersion || 'None')}
+  Fixed Version: ${(vuln.fixedInVersion || 'Unknown')}
   Exploitable: ${vuln.exploitable}
-  Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})`
+  Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})`;
   ;
 }
 
@@ -486,7 +499,8 @@ async function generateSummary(tag, scanResult, data) {
   .addHeading('Scan Results')
   .addRaw(`Policies evaluation: ${data.result.policyEvaluationsResult} ${EVALUATION[data.result.policyEvaluationsResult]}`);
   
-  addReportToSummary(data)
+  addVulnTableToSummary(data);
+  addReportToSummary(data);
 
   await core.summary.write();
 
@@ -552,7 +566,7 @@ function getRulePkgMessage(rule, packages) {
       `${vuln.cvssScore.value.score}`,
       `${vuln.cvssScore.value.version}`,
       `${vuln.cvssScore.value.vector}`,
-      `${pkg.suggestedFix || "None"}`,
+      `${pkg.suggestedFix || "Unknown"}`,
       `${vuln.exploitable}`
     ]);
   });
@@ -568,6 +582,17 @@ function getRuleImageMessage(rule) {
   });
 
   core.summary.addList(message);
+}
+
+function addVulnTableToSummary(data) {
+  let totalVuln = data.result.vulnTotalBySeverity;
+  let fixableVuln = data.result.fixableVulnTotalBySeverity;
+
+  core.summary.addTable([
+    [{data: '', header: true}, {data: 'Critical', header: true}, {data: 'High', header: true}, {data: 'Medium', header: true}, {data: 'Low', header: true}, {data: 'Negligible', header: true}],
+    [{data: 'Total Vulnerabilities', header: true}, `${totalVuln.critical}`, `${totalVuln.high}`, `${totalVuln.medium}`, `${totalVuln.low}`, `${totalVuln.negligible}`],
+    [{data: 'Fixable Vulnerabilities', header: true}, `${fixableVuln.critical}`, `${fixableVuln.high}`, `${fixableVuln.medium}`, `${fixableVuln.low}`, `${fixableVuln.negligible}`],
+  ]);
 }
 
 function addReportToSummary(data) {
