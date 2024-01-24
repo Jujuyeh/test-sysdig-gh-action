@@ -215,7 +215,7 @@ async function processScanResult(result, opts) {
     }
 
     generateSARIFReport(report);
-    await generateSummary(opts.standalone, report);
+    await generateSummary(opts.standalone, opts.overridePullString, report);
   }
 }
 
@@ -474,9 +474,16 @@ function generateSARIFReport(data) {
   fs.writeFileSync("./sarif.json", JSON.stringify(sarifOutput, null, 2));
 }
 
-async function generateSummary(standalone, data) {
+async function generateSummary(standalone, pullString, data) {
 
-  core.summary.addHeading('Scan Results');
+  let imageName = data.result.metadata.pullString;
+  
+  if (pullString) {
+    imageName += ` (${pullString})`;
+  }
+
+  core.summary.emptyBuffer();
+  core.summary.addHeading(`Scan Results for ${imageName}`);
   
   addVulnTableToSummary(data);
 
