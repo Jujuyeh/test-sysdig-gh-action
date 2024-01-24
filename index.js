@@ -44,12 +44,13 @@ function parseActionInputs() {
     registryPassword: core.getInput('registry-password'),
     stopOnFailedPolicyEval: core.getInput('stop-on-failed-policy-eval') == 'true',
     stopOnProcessingError: core.getInput('stop-on-processing-error') == 'true',
+    standalone: core.getInput('standalone') == 'true',
     dbPath: core.getInput('db-path'),
     skipUpload: core.getInput('skip-upload') == 'true',
     usePolicies: core.getInput('use-policies'),
     overridePullString: core.getInput('override-pullstring'),
     imageTag: core.getInput('image-tag', { required: true }),
-    sysdigSecureToken: core.getInput('sysdig-secure-token', { required: true }),
+    sysdigSecureToken: core.getInput('sysdig-secure-token'),
     sysdigSecureURL: core.getInput('sysdig-secure-url') || defaultSecureEndpoint,
     sysdigSkipTLS: core.getInput('sysdig-skip-tls') == 'true',
     extraParameters: core.getInput('extra-parameters'),
@@ -58,6 +59,10 @@ function parseActionInputs() {
 
 
 function printOptions(opts) {
+  if (opts.standalone) {
+    core.info(`[!] Running in Standalone Mode.`);
+  }
+
   if (opts.sysdigSecureURL) {
     core.info('Sysdig Secure URL: ' + opts.sysdigSecureURL);
   }
@@ -103,6 +108,10 @@ function composeFlags(opts) {
 
   if (opts.registryPassword) {
     envvars['REGISTRY_PASSWORD'] = opts.registryPassword;
+  }
+
+  if (opts.standalone) {
+    flags += " --standalone";
   }
 
   if (opts.sysdigSecureURL) {
@@ -162,9 +171,11 @@ async function run() {
 
     if (opts.stopOnFailedPolicyEval && scanResult.ReturnCode == 1) {
       core.setFailed(`Stopping because Policy Evaluation was FAILED.`);
+    } else if (opts.standalone && scanResult.ReturnCode == 0) {
+      core.info("Policy Evaluation was OMITTED.");
     } else if (scanResult.ReturnCode == 0) {
       core.info("Policy Evaluation was PASSED.");
-    } else if (opts.stopOnProcessingError) {
+    } else if (opts.stopOnProcessingError && scanResult.ReturnCode > 1) {
       core.setFailed(`Stopping because the scanner terminated with an error.`);
     } // else: Don't stop regardless the outcome.
 
@@ -177,20 +188,6 @@ async function run() {
 }
 
 async function processScanResult(result, opts) {
-  let scanResult;
-  if (result.ReturnCode == 0) {
-    scanResult = "Success";
-    core.info(`Scan was SUCCESS.`);
-  } else if (result.ReturnCode == 1) {
-    scanResult = "Failed";
-    core.info(`Scan was FAILED.`);
-  } else if (result.ReturnCode == 2) {
-    core.setFailed("Invalid Parameters");
-    throw new ExecutionError(result.Output, result.Error);
-  } else {
-    core.setFailed("Execution error");
-    throw new ExecutionError(result.Output, result.Error);
-  }
 
   writeReport(result.Output);
 
@@ -212,7 +209,7 @@ async function processScanResult(result, opts) {
     }
 
     generateSARIFReport(report);
-    await generateSummary(tag, scanResult, report);
+    await generateSummary(opts.standalone, report);
   }
 }
 
@@ -471,73 +468,20 @@ function generateSARIFReport(data) {
   fs.writeFileSync("./sarif.json", JSON.stringify(sarifOutput, null, 2));
 }
 
-async function generateSummary(tag, scanResult, data) {
-  // const githubToken = core.getInput('github-token');
-  // if (!githubToken) {
-  //   core.warning("No github-token provided. Skipping creation of check run");
-  // }
+async function generateSummary(standalone, data) {
 
-  // let octokit;
-  // let annotations;
-  // let check_run;
-
-  // try {
-  //   octokit = github.getOctokit(githubToken);
-  // } catch (error) {
-  //   core.warning("Error creating octokit: " + error);
-  //   return;
-  // }
-
-
-
-  core.summary
-  .addHeading('Scan Results')
-  .addRaw(`Policies evaluation: ${data.result.policyEvaluationsResult} ${EVALUATION[data.result.policyEvaluationsResult]}`);
+  core.summary.addHeading('Scan Results');
   
   addVulnTableToSummary(data);
-  addReportToSummary(data);
 
+  if (!standalone) {
+    core.summary.addBreak()
+        .addRaw(`Policies evaluation: ${data.result.policyEvaluationsResult} ${EVALUATION[data.result.policyEvaluationsResult]}`);
+    
+    addReportToSummary(data);
+  }
+  
   await core.summary.write();
-
-  // let conclusion = "success";
-  // if (scanResult != "Success") {
-  //   conclusion = "failure";
-  // }
-
-  // try {
-  //   check_run = await octokit.rest.checks.create({
-  //     owner: github.context.repo.owner,
-  //     repo: github.context.repo.repo,
-  //     name: `Scan results for ${tag}`,
-  //     head_sha: github.context.sha,
-  //     status: "completed",
-  //     conclusion:  conclusion,
-  //     output: {
-  //       title: `Inline scan results for ${tag}`,
-  //       summary: "Scan result is " + scanResult,
-  //       annotations: annotations.slice(0,50)
-  //     }
-  //   });
-  // } catch (error) {
-  //   core.warning("Error creating check run: " + error);
-  // }
-
-  // try {
-  //   for (let i = 50; i < annotations.length; i+=50) {
-  //     await octokit.rest.checks.update({
-  //       owner: github.context.repo.owner,
-  //       repo: github.context.repo.repo,
-  //       check_run_id: check_run.data.id,
-  //       output: {
-  //         title: "Inline scan results",
-  //         summary: "Scan result is " + scanResult,
-  //         annotations: annotations.slice(i, i+50)
-  //       }
-  //     });
-  //   }
-  // } catch (error) {
-  //   core.warning("Error updating check run: " + error);
-  // }
 }
 
 function getRulePkgMessage(rule, packages) {
