@@ -457,7 +457,8 @@ function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
   Fixed Version: ${(vuln.fixedInVersion || 'Unknown')}
   Exploitable: ${vuln.exploitable}
   Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})`;
-  ;
+  
+  return message;
 }
 
 function getRuleId(v) {
@@ -582,10 +583,11 @@ function addVulnTableToSummary(data) {
   let totalVuln = data.result.vulnTotalBySeverity;
   let fixableVuln = data.result.fixableVulnTotalBySeverity;
 
+  core.summary.addBreak;
   core.summary.addTable([
-    [{data: '', header: true}, {data: 'Critical', header: true}, {data: 'High', header: true}, {data: 'Medium', header: true}, {data: 'Low', header: true}, {data: 'Negligible', header: true}],
-    [{data: 'Total Vulnerabilities', header: true}, `${totalVuln.critical}`, `${totalVuln.high}`, `${totalVuln.medium}`, `${totalVuln.low}`, `${totalVuln.negligible}`],
-    [{data: 'Fixable Vulnerabilities', header: true}, `${fixableVuln.critical}`, `${fixableVuln.high}`, `${fixableVuln.medium}`, `${fixableVuln.low}`, `${fixableVuln.negligible}`],
+    [{data: '', header: true}, {data: '🟣 Critical', header: true}, {data: '🔴 High', header: true}, {data: '🟠 Medium', header: true}, {data: '🟡 Low', header: true}, {data: '⚪ Negligible', header: true}],
+    [{data: '⚠️ Total Vulnerabilities', header: true}, `${totalVuln.critical}`, `${totalVuln.high}`, `${totalVuln.medium}`, `${totalVuln.low}`, `${totalVuln.negligible}`],
+    [{data: '🔧 Fixable Vulnerabilities', header: true}, `${fixableVuln.critical}`, `${fixableVuln.high}`, `${fixableVuln.medium}`, `${fixableVuln.low}`, `${fixableVuln.negligible}`],
   ]);
 }
 
