@@ -493,7 +493,7 @@ async function generateSummary(standalone, pullString, data) {
     addReportToSummary(data);
   }
   
-  await core.summary.write();
+  await core.summary.write({overwrite: true});
 }
 
 function getRulePkgMessage(rule, packages) {
