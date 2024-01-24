@@ -23,6 +23,7 @@ jobs:
           sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
           stop-on-failed-policy-eval: false
           stop-on-processing-error: true
+          skip-summary: true
 
       - name: Scan dummy-vuln-app from registry
         id: scan

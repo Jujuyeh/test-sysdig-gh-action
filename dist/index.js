@@ -53,6 +53,7 @@ function parseActionInputs() {
     standalone: core.getInput('standalone') == 'true',
     dbPath: core.getInput('db-path'),
     skipUpload: core.getInput('skip-upload') == 'true',
+    skipSummary: core.getInput('skip-summary') == 'true',
     usePolicies: core.getInput('use-policies'),
     overridePullString: core.getInput('override-pullstring'),
     imageTag: core.getInput('image-tag', { required: true }),
@@ -99,6 +100,10 @@ function printOptions(opts) {
 
   if (opts.overridePullString) {
     core.info(` * Image PullString will be overwritten as ${opts.overridePullString}`);
+  }
+
+  if (opts.skipSummary) {
+    core.info("This run will NOT generate a SUMMARY.");
   }
 }
 
@@ -215,7 +220,13 @@ async function processScanResult(result, opts) {
     }
 
     generateSARIFReport(report);
-    await generateSummary(opts.standalone, opts.overridePullString, report);
+
+    if (!opts.skipSummary) {
+      core.info("Generating Summary...")
+      await generateSummary(opts.standalone, opts.overridePullString, report);
+    } else {
+      core.info("Skipping Summary...")
+    }
   }
 }
 
@@ -482,7 +493,7 @@ async function generateSummary(standalone, pullString, data) {
     imageName += ` (${pullString})`;
   }
 
-  core.summary.clear();
+  core.summary.emptyBuffer().clear();
   core.summary.addHeading(`Scan Results for ${imageName}`);
   
   addVulnTableToSummary(data);
