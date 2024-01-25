@@ -494,7 +494,7 @@ function generateSARIFReport(data) {
 async function generateSummary(opts, data) {
 
   core.summary.emptyBuffer().clear();
-  core.summary.addHeading(`Scan Results for ${opts.imageTag} (${opts.overridePullString})`);
+  core.summary.addHeading(`Scan Results for ${opts.overridePullString || opts.imageTag}`);
   
   addVulnTableToSummary(data);
 
