@@ -325,7 +325,7 @@ describe("process scan results", () => {
             overridePullString: null
         }
         await index.processScanResult(scanResult, opts);
-        expect(fs.writeFileSync.mock.calls[1][1]).toMatch(exampleSarif);
+        expect(fs.writeFileSync.mock.calls[3][1]).toMatch(exampleSarif);
         fs.writeFileSync = realWriteFileSync;
     })
 })
