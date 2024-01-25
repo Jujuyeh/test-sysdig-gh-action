@@ -1,1 +1,9 @@
 node_modules/
+
+# Editors
+.vscode/
+.idea/
+*.iml
+node_modules/
+report.json
+sarif.json

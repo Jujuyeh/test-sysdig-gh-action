@@ -4,7 +4,31 @@ on:
   workflow_dispatch:
 
 jobs:
-  
+  scan-from-registry:
+    runs-on: ubuntu-latest
+
+    steps:
+      # This step checks out a copy of your repository.
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Scan dummy-vuln-app from registry
+        id: scan
+        uses: ./
+        with:
+          # Tag of the image to analyse
+          image-tag: sysdiglabs/dummy-vuln-app:latest
+          # API token for Sysdig Scanning auth
+          sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
+          stop-on-failed-policy-eval: true
+          stop-on-processing-error: true
+
+      - name: Upload SARIF file
+        if: success() || failure() # Upload results regardless previous step fails
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ github.workspace }}/sarif.json
+
   standalone-scan-from-registry:
     runs-on: ubuntu-latest
 
@@ -23,7 +47,6 @@ jobs:
           sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
           stop-on-failed-policy-eval: false
           stop-on-processing-error: true
-          skip-summary: true
 
       - name: Scan dummy-vuln-app from registry
         id: scan
@@ -43,28 +66,3 @@ jobs:
         with:
           sarif_file: ${{ github.workspace }}/sarif.json
 
-  scan-from-registry:
-    runs-on: ubuntu-latest
-
-    steps:
-      # This step checks out a copy of your repository.
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Scan dummy-vuln-app from registry
-        id: scan
-        uses: ./
-        with:
-          # Tag of the image to analyse
-          image-tag: sysdiglabs/dummy-vuln-app:latest
-          # API token for Sysdig Scanning auth
-          sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
-          stop-on-failed-policy-eval: true
-          stop-on-processing-error: true
-          override-pullstring: my-cool-image
-
-      - name: Upload SARIF file
-        if: success() || failure() # Upload results regardless previous step fails
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ github.workspace }}/sarif.json

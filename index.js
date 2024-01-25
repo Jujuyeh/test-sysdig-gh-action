@@ -1,8 +1,6 @@
 const core = require('@actions/core');
 const exec = require('@actions/exec');
-const fs = require('fs')
-const github = require('@actions/github')
-const path = require('path');
+const fs = require('fs');
 const performance = require('perf_hooks').performance;
 const process = require('process');
 
@@ -167,20 +165,28 @@ async function run() {
     printOptions(opts);
     let scanFlags = composeFlags(opts);
 
-    await pullScanner(opts.cliScannerURL);
-    let scanResult = await executeScan(scanFlags.envvars, scanFlags.flags);
+    let scanResult;
+    let retCode = await pullScanner(opts.cliScannerURL);
+    if (retCode == 0) {
+      scanResult = await executeScan(scanFlags.envvars, scanFlags.flags);
 
-    if (scanResult.ReturnCode == 0 || scanResult.ReturnCode == 1) {
-      await processScanResult(scanResult, opts);
+      retCode = scanResult.ReturnCode;
+      if (retCode == 0 || retCode == 1) {
+        await processScanResult(scanResult, opts);
+      } else {
+        core.error("Terminating scan. Scanner couldn't be executed.")
+      }
+    } else {
+      core.error("Terminating scan. Scanner couldn't be pulled.")
     }
 
-    if (opts.stopOnFailedPolicyEval && scanResult.ReturnCode == 1) {
+    if (opts.stopOnFailedPolicyEval && retCode == 1) {
       core.setFailed(`Stopping because Policy Evaluation was FAILED.`);
-    } else if (opts.standalone && scanResult.ReturnCode == 0) {
+    } else if (opts.standalone && retCode == 0) {
       core.info("Policy Evaluation was OMITTED.");
-    } else if (scanResult.ReturnCode == 0) {
+    } else if (retCode == 0) {
       core.info("Policy Evaluation was PASSED.");
-    } else if (opts.stopOnProcessingError && scanResult.ReturnCode > 1) {
+    } else if (opts.stopOnProcessingError && retCode > 1) {
       core.setFailed(`Stopping because the scanner terminated with an error.`);
     } // else: Don't stop regardless the outcome.
 
@@ -205,14 +211,6 @@ async function processScanResult(result, opts) {
   }
 
   if (report) {
-
-    let tag = "";
-    try {
-      tag = report.result.metadata.pullString;
-    } catch (error) {
-      core.error("Error parsing results report: " + error);
-    }
-
     generateSARIFReport(report);
 
     if (!opts.skipSummary) {
@@ -228,11 +226,17 @@ async function pullScanner(scannerURL) {
   let start = performance.now();
   core.info('Pulling cli-scanner from: ' + scannerURL);
   let cmd = `wget ${scannerURL} -O ./${cliScannerName}`;
-  await exec.exec(cmd, null, {silent: true});
+  let retCode = await exec.exec(cmd, null, {silent: true});
 
-  cmd = `chmod u+x ./${cliScannerName}`;
-  await exec.exec(cmd, null, {silent: true});
+  if (retCode == 0) {
+    cmd = `chmod u+x ./${cliScannerName}`;
+    await exec.exec(cmd, null, {silent: true});
+  } else {
+    core.error(`Falied to pull scanner using "${scannerURL}"`)
+  }
+  
   core.info("Scanner pull took " + Math.round(performance.now() - start) + " milliseconds.");
+  return retCode;
 }
 
 async function executeScan(envvars, flags) {
@@ -283,6 +287,10 @@ async function executeScan(envvars, flags) {
 
 function vulnerabilities2SARIF(data) {
   const [rules, results] = vulnerabilities2SARIFRes(data)
+
+  if (!rules.length || !results.length) {
+    return {};
+  }
 
   const runs = [{
     tool: {
@@ -348,66 +356,68 @@ function vulnerabilities2SARIFRes(data) {
   let resultUrl = "";
   let baseUrl = null;
   
-  if (data.info.resultUrl) {
-    resultUrl = data.info.resultUrl;
-    baseUrl = resultUrl.slice(0,resultUrl.lastIndexOf('/'));
-  }
-
-  data.result.packages.forEach(function (pkg, index) {
-    if (!pkg.vulns) {
-      return
+  if (data.info && data.result) {
+    if (data.info.resultUrl) {
+      resultUrl = data.info.resultUrl;
+      baseUrl = resultUrl.slice(0,resultUrl.lastIndexOf('/'));
     }
-
-    pkg.vulns.forEach(function (vuln, index) {
-      if (!(vuln.name in ruleIds)){
-        ruleIds.push(vuln.name)
-        rule = {
-          id: vuln.name,
-          name: pkg.type,
-          shortDescription: {
-            text: getSARIFVulnShortDescription(pkg, vuln)
-          },
-          fullDescription: {
-            text: getSARIFVulnFullDescription(pkg, vuln)
-          },
-          helpUri: `https://nvd.nist.gov/vuln/detail/${vuln.name}`,
-          help: getSARIFVulnHelp(pkg, vuln),
-          properties: {
-            precision: "very-high",
-            'security-severity': `${vuln.cvssScore.value.score}`,
-            tags: [
-                'vulnerability',
-                'security',
-                vuln.severity.value
-            ]
+  
+    data.result.packages.forEach(pkg => {
+      if (!pkg.vulns) {
+        return
+      }
+  
+      pkg.vulns.forEach(vuln =>{
+        if (!(vuln.name in ruleIds)){
+          ruleIds.push(vuln.name)
+          let rule = {
+            id: vuln.name,
+            name: pkg.type,
+            shortDescription: {
+              text: getSARIFVulnShortDescription(pkg, vuln)
+            },
+            fullDescription: {
+              text: getSARIFVulnFullDescription(pkg, vuln)
+            },
+            helpUri: `https://nvd.nist.gov/vuln/detail/${vuln.name}`,
+            help: getSARIFVulnHelp(pkg, vuln),
+            properties: {
+              precision: "very-high",
+              'security-severity': `${vuln.cvssScore.value.score}`,
+              tags: [
+                  'vulnerability',
+                  'security',
+                  vuln.severity.value
+              ]
+            }
           }
+          rules.push(rule)
         }
-        rules.push(rule)
-      }
-
-      result = {
-        ruleId: vuln.name,
-        level: check_level(vuln.severity.value),
-        message: {
-          text: getSARIFReportMessage(data, vuln, pkg, baseUrl)
-        },
-        locations: [
-          {
-              physicalLocation: {
-                  artifactLocation: {
-                      uri: data.result.metadata.pullString,
-                      uriBaseId: "ROOTPATH"
-                  }
-              },
-              message: {
-                  text: `${data.result.metadata.pullString} - ${pkg.name}@${pkg.version}`
-              }
-          }
-        ]
-      }
-      results.push(result)
+  
+        let result = {
+          ruleId: vuln.name,
+          level: check_level(vuln.severity.value),
+          message: {
+            text: getSARIFReportMessage(data, vuln, pkg, baseUrl)
+          },
+          locations: [
+            {
+                physicalLocation: {
+                    artifactLocation: {
+                        uri: data.result.metadata.pullString,
+                        uriBaseId: "ROOTPATH"
+                    }
+                },
+                message: {
+                    text: `${data.result.metadata.pullString} - ${pkg.name}@${pkg.version}`
+                }
+            }
+          ]
+        }
+        results.push(result)
+      });
     });
-  });
+  }
   
   return [rules, results];
 }
@@ -450,13 +460,13 @@ URL: https://nvd.nist.gov/vuln/detail/${vuln.name}`,
 function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
   let message = `Full image scan results in Sysdig UI: [${data.result.metadata.pullString} scan result](${data.info.resultUrl})`;
 
-  if (baseUrl) message += `Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+(\"${pkg.name}\"))`;
+  if (baseUrl) message += `Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+("${pkg.name}"))`;
   
   message += `Package type: ${pkg.type}
   Installed Version: ${pkg.version}
   Package path: ${pkg.path}`;
 
-  if (baseUrl) message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+(\"${vuln.name}\"))`;
+  if (baseUrl) message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+("${vuln.name}"))`;
   
   message += `Severity: ${vuln.severity.value}
   CVSS Score: ${vuln.cvssScore.value.score}
@@ -467,10 +477,6 @@ function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
   Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})`;
   
   return message;
-}
-
-function getRuleId(v) {
-  return "VULN_" + v.vuln + "_" + v.package_type + "_" + v.package;
 }
 
 function generateSARIFReport(data) {
@@ -582,7 +588,12 @@ module.exports = {
   pullScanner,
   executeScan,
   processScanResult,
-  run
+  run,
+  cliScannerName,
+  cliScannerResult,
+  cliScannerVersion,
+  cliScannerURL,
+  defaultSecureEndpoint
 };
 
 if (require.main === module) {
