@@ -221,7 +221,7 @@ async function processScanResult(result, opts) {
 
     if (!opts.skipSummary) {
       core.info("Generating Summary...")
-      await generateSummary(opts.standalone, opts.overridePullString, report);
+      await generateSummary(opts, report);
     } else {
       core.info("Skipping Summary...")
     }
@@ -491,14 +491,14 @@ function generateSARIFReport(data) {
   fs.writeFileSync("./sarif.json", JSON.stringify(sarifOutput, null, 2));
 }
 
-async function generateSummary(standalone, pullString, data) {
+async function generateSummary(opts, data) {
 
   core.summary.emptyBuffer().clear();
-  core.summary.addHeading(`Scan Results for ${pullString}`);
+  core.summary.addHeading(`Scan Results for ${opts.imageTag} (${opts.overridePullString})`);
   
   addVulnTableToSummary(data);
 
-  if (!standalone) {
+  if (!opts.standalone) {
     core.summary.addBreak()
         .addRaw(`Policies evaluation: ${data.result.policyEvaluationsResult} ${EVALUATION[data.result.policyEvaluationsResult]}`);
     
