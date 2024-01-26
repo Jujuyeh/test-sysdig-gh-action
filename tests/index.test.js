@@ -48,6 +48,7 @@ describe("input parsing", () => {
 
         expect(opts).toEqual({
             "cliScannerURL": `${index.cliScannerURL}`,
+            "cliScannerVersion": "",
             "registryUser": "",
             "registryPassword": "",
             "stopOnFailedPolicyEval": false,
@@ -68,6 +69,7 @@ describe("input parsing", () => {
 
     it("parses all inputs", () => {
         process.env['INPUT_CLI-SCANNER-URL'] = "https://foo";
+        process.env['INPUT_CLI-SCANNER-VERSION'] = "1.0.0";
         process.env['INPUT_REGISTRY-USER'] = "user";
         process.env['INPUT_REGISTRY-PASSWORD'] = "pass";
         process.env['INPUT_STOP-ON-FAILED-POLICY-EVAL'] = "true";
@@ -87,6 +89,7 @@ describe("input parsing", () => {
 
         expect(opts).toEqual({
             "cliScannerURL": "https://foo",
+            "cliScannerVersion": "1.0.0",
             "registryUser": "user",
             "registryPassword": "pass",
             "stopOnFailedPolicyEval": true,
@@ -325,7 +328,7 @@ describe("process scan results", () => {
             overridePullString: null
         }
         await index.processScanResult(scanResult, opts);
-        expect(fs.writeFileSync.mock.calls[3][1]).toMatch(exampleSarif);
+        expect(fs.writeFileSync).toBeCalledWith("./sarif.json", exampleSarif);
         fs.writeFileSync = realWriteFileSync;
     })
 })

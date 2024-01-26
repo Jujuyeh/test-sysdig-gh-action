@@ -9,17 +9,40 @@ const exec = __nccwpck_require__(514);
 const fs = __nccwpck_require__(147);
 const performance = (__nccwpck_require__(74).performance);
 const process = __nccwpck_require__(282);
+const { version } = __nccwpck_require__(598);
 
-const toolVersion = "3.0.0";
-const dottedQuadToolVersion = "3.0.0.0";
+const toolVersion = `${version}`;
+const dottedQuadToolVersion = `${version}.0`;
 
-const cliScannerVersion = "1.8.0"
+function getRunArch() {
+  let arch = "unknown";
+  if (core.platform.arch == "x64") {
+    arch = "amd64";
+  } else if (core.platform.arch == "arm64") {
+    arch = "arm64";
+  }
+  return arch;
+}
+
+function getRunOS() {
+  let os_name = "unknown";
+  if (core.platform.platform == "linux") {
+    os_name = "linux";
+  } else if (core.platform.platform == "darwin") {
+    os_name = "darwin";
+  }
+  return os_name;
+}
+
+const cliScannerVersion = "1.8.1"
 const cliScannerName = "sysdig-cli-scanner"
-const cliScannerURL = `https://download.sysdig.com/scanning/bin/sysdig-cli-scanner/${cliScannerVersion}/linux/amd64/${cliScannerName}`
+const cliScannerOS = getRunOS()
+const cliScannerArch = getRunArch()
+const cliScannerURLBase = "https://download.sysdig.com/scanning/bin/sysdig-cli-scanner";
+const cliScannerURL = `${cliScannerURLBase}/${cliScannerVersion}/${cliScannerOS}/${cliScannerArch}/${cliScannerName}`
 const cliScannerResult = "scan-result.json"
 
 const defaultSecureEndpoint = "https://secure.sysdig.com/"
-//const secureInlineScanImage = "quay.io/sysdig/secure-inline-scan:2"; // Hay que bajar el binario en vez de la imagen
 
 // Sysdig to SARIF severity convertion
 const LEVELS = {
@@ -41,9 +64,12 @@ class ExecutionError extends Error {
   }
 }
 
+
+
 function parseActionInputs() {
   return {
     cliScannerURL: core.getInput('cli-scanner-url') || cliScannerURL,
+    cliScannerVersion: core.getInput('cli-scanner-version'),
     registryUser: core.getInput('registry-user'),
     registryPassword: core.getInput('registry-password'),
     stopOnFailedPolicyEval: core.getInput('stop-on-failed-policy-eval') == 'true',
@@ -171,13 +197,21 @@ async function run() {
     printOptions(opts);
     let scanFlags = composeFlags(opts);
 
+    // If custom scanner version is specified
+    if (opts.cliScannerVersion) {
+      opts.cliScannerURL = `${cliScannerURLBase}/${opts.cliScannerVersion}/${cliScannerOS}/${cliScannerArch}/${cliScannerName}`
+    }
+
     let scanResult;
-    let retCode = await pullScanner(opts.cliScannerURL);
+    // Download CLI Scanner from 'cliScannerURL'
+    let retCode = await pullScanner();
     if (retCode == 0) {
+      // Execute Scanner
       scanResult = await executeScan(scanFlags.envvars, scanFlags.flags);
 
       retCode = scanResult.ReturnCode;
       if (retCode == 0 || retCode == 1) {
+        // Transform Scan Results to other formats such as SARIF
         await processScanResult(scanResult, opts);
       } else {
         core.error("Terminating scan. Scanner couldn't be executed.")
@@ -598,6 +632,9 @@ module.exports = {
   cliScannerName,
   cliScannerResult,
   cliScannerVersion,
+  cliScannerArch,
+  cliScannerOS,
+  cliScannerURLBase,
   cliScannerURL,
   defaultSecureEndpoint
 };
@@ -1166,7 +1203,7 @@ class OidcClient {
                 .catch(error => {
                 throw new Error(`Failed to get ID Token. \n 
         Error Code : ${error.statusCode}\n 
-        Error Message: ${error.result.message}`);
+        Error Message: ${error.message}`);
             });
             const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
             if (!id_token) {
@@ -4688,6 +4725,14 @@ module.exports = require("tls");
 
 "use strict";
 module.exports = require("util");
+
+/***/ }),
+
+/***/ 598:
+/***/ ((module) => {
+
+"use strict";
+module.exports = JSON.parse('{"name":"secure-inline-scan-action","version":"3.6.0","description":"This actions performs image analysis on locally built container image and posts the result of the analysis to Sysdig Secure.","main":"index.js","scripts":{"lint":"eslint .","prepare":"ncc build index.js -o dist --source-map --license licenses.txt","test":"jest","all":"npm run lint && npm run prepare && npm run test"},"repository":{"type":"git","url":"git+https://github.com/sysdiglabs/secure-inline-scan-action.git"},"keywords":["sysdig","secure","container","image","scanning","docker"],"author":"airadier","license":"Apache-2.0","bugs":{"url":"https://github.com/sysdiglabs/secure-inline-scan-action/issues"},"homepage":"https://github.com/sysdiglabs/secure-inline-scan-action#readme","dependencies":{"@actions/core":"^1.10.1","@actions/exec":"^1.1.0","@actions/github":"^5.0.0"},"devDependencies":{"@vercel/ncc":"^0.36.1","eslint":"^7.32.0","jest":"^27.0.6","tmp":"^0.2.1"}}');
 
 /***/ })
 
