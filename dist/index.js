@@ -10,15 +10,16 @@ const fs = __nccwpck_require__(147);
 const performance = (__nccwpck_require__(74).performance);
 const process = __nccwpck_require__(282);
 const { version } = __nccwpck_require__(598);
+const os = __nccwpck_require__(37);
 
 const toolVersion = `${version}`;
 const dottedQuadToolVersion = `${version}.0`;
 
 function getRunArch() {
   let arch = "unknown";
-  if (core.platform.arch == "x64") {
+  if (os.arch() == "x64") {
     arch = "amd64";
-  } else if (core.platform.arch == "arm64") {
+  } else if (os.arch() == "arm64") {
     arch = "arm64";
   }
   return arch;
@@ -26,9 +27,9 @@ function getRunArch() {
 
 function getRunOS() {
   let os_name = "unknown";
-  if (core.platform.platform == "linux") {
+  if (os.platform() == "linux") {
     os_name = "linux";
-  } else if (core.platform.platform == "darwin") {
+  } else if (os.platform() == "darwin") {
     os_name = "darwin";
   }
   return os_name;
@@ -4732,7 +4733,7 @@ module.exports = require("util");
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse('{"name":"secure-inline-scan-action","version":"3.6.0","description":"This actions performs image analysis on locally built container image and posts the result of the analysis to Sysdig Secure.","main":"index.js","scripts":{"lint":"eslint .","prepare":"ncc build index.js -o dist --source-map --license licenses.txt","test":"jest","all":"npm run lint && npm run prepare && npm run test"},"repository":{"type":"git","url":"git+https://github.com/sysdiglabs/secure-inline-scan-action.git"},"keywords":["sysdig","secure","container","image","scanning","docker"],"author":"airadier","license":"Apache-2.0","bugs":{"url":"https://github.com/sysdiglabs/secure-inline-scan-action/issues"},"homepage":"https://github.com/sysdiglabs/secure-inline-scan-action#readme","dependencies":{"@actions/core":"^1.10.1","@actions/exec":"^1.1.0","@actions/github":"^5.0.0"},"devDependencies":{"@vercel/ncc":"^0.36.1","eslint":"^7.32.0","jest":"^27.0.6","tmp":"^0.2.1"}}');
+module.exports = JSON.parse('{"name":"secure-inline-scan-action","version":"4.0.0","description":"This actions performs image analysis on locally built container image and posts the result of the analysis to Sysdig Secure.","main":"index.js","scripts":{"lint":"eslint .","prepare":"ncc build index.js -o dist --source-map --license licenses.txt","test":"jest","all":"npm run lint && npm run prepare && npm run test"},"repository":{"type":"git","url":"git+https://github.com/sysdiglabs/secure-inline-scan-action.git"},"keywords":["sysdig","secure","container","image","scanning","docker"],"author":"airadier","license":"Apache-2.0","bugs":{"url":"https://github.com/sysdiglabs/secure-inline-scan-action/issues"},"homepage":"https://github.com/sysdiglabs/secure-inline-scan-action#readme","dependencies":{"@actions/core":"^1.10.1","@actions/exec":"^1.1.0","@actions/github":"^5.0.0"},"devDependencies":{"@vercel/ncc":"^0.36.1","eslint":"^7.32.0","jest":"^27.0.6","tmp":"^0.2.1"}}');
 
 /***/ })
 
