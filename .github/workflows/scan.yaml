@@ -8,9 +8,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # This step checks out a copy of your repository.
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Scan dummy-vuln-app from registry
         id: scan
-        uses: sysdiglabs/scan-action@v4
+        uses: ./
         with:
           # Tag of the image to analyse
           image-tag: sysdiglabs/dummy-vuln-app:latest
@@ -29,9 +33,13 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      # This step checks out a copy of your repository.
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Scan dummy-vuln-app from registry
         id: scan
-        uses: sysdiglabs/scan-action@v4
+        uses: ./
         with:
           # Tag of the image to analyse
           image-tag: sysdiglabs/dummy-vuln-app:latest
@@ -51,9 +59,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # This step checks out a copy of your repository.
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Donate MainDB from scan
         id: donnor-scan
-        uses: sysdiglabs/scan-action@v4
+        uses: ./
         with:
           # Tag of the image to analyse
           image-tag: sysdiglabs/dummy-vuln-app:latest
@@ -65,7 +77,7 @@ jobs:
 
       - name: Scan dummy-vuln-app from registry
         id: scan
-        uses: sysdiglabs/scan-action@v4
+        uses: ./
         with:
           # Tag of the image to analyse
           image-tag: sysdiglabs/dummy-vuln-app:latest
