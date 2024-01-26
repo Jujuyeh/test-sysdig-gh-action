@@ -199,7 +199,7 @@ async function run() {
 
     let scanResult;
     // Download CLI Scanner from 'cliScannerURL'
-    let retCode = await pullScanner();
+    let retCode = await pullScanner(opts.cliScannerURL);
     if (retCode == 0) {
       // Execute Scanner
       scanResult = await executeScan(scanFlags.envvars, scanFlags.flags);
