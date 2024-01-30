@@ -663,7 +663,8 @@ function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
   CVSS Vector: ${vuln.cvssScore.value.vector}
   Fixed Version: ${(vuln.fixedInVersion || 'Unknown')}
   Exploitable: ${vuln.exploitable}
-  Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})`;
+  Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})
+  \n\n\n`;
   
   return message;
 }
