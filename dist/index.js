@@ -441,13 +441,11 @@ function vulnerabilities2SARIFResByPackage(data) {
 
       let helpUri = "";
       let fullDescription = "";
-      let message_text = "";
       let severity_level = "";
       let severity_num = 5;
       let score = 0.0;
       pkg.vulns.forEach(vuln => {
         fullDescription += `${getSARIFVulnFullDescription(pkg, vuln)}\n\n\n`;
-        message_text += `${getSARIFReportMessage(data, vuln, pkg, baseUrl)}\n\n\n`;
 
         if (PRIORITY[vuln.severity.value.toLowerCase()] < severity_num) {
           severity_level = vuln.severity.value.toLowerCase();
@@ -488,7 +486,7 @@ function vulnerabilities2SARIFResByPackage(data) {
         ruleId: pkg.name,
         level: check_level(severity_level),
         message: {
-          text: message_text
+          text: getSARIFReportMessageByPackage(data, pkg, baseUrl)
         },
         locations: [
           {
@@ -646,25 +644,66 @@ URL: https://nvd.nist.gov/vuln/detail/${vuln.name}`,
   }
 }
 
-function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
+function getSARIFReportMessageByPackage(data, pkg, baseUrl) {
   let message = `Full image scan results in Sysdig UI: [${data.result.metadata.pullString} scan result](${data.info.resultUrl})\n`;
 
-  if (baseUrl) message += `Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+("${pkg.name}"))\n`;
+  if (baseUrl) {
+    message += `Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+("${pkg.name}"))\n`;
+  } else {
+    message += `Package: ${pkg.name}\n`;
+  }
   
   message += `Package type: ${pkg.type}
   Installed Version: ${pkg.version}
   Package path: ${pkg.path}\n`;
 
-  if (baseUrl) message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+("${vuln.name}"))\n`;
+  pkg.vulns.forEach(vuln => {
+    if (baseUrl) {
+      message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+("${vuln.name}"))\n`;
+    } else {
+      message += `Vulnerability: ${vuln.name}\n`;
+    }
+    
+    message += `Severity: ${vuln.severity.value}
+    CVSS Score: ${vuln.cvssScore.value.score}
+    CVSS Version: ${vuln.cvssScore.value.version}
+    CVSS Vector: ${vuln.cvssScore.value.vector}
+    Fixed Version: ${(vuln.fixedInVersion || 'Unknown')}
+    Exploitable: ${vuln.exploitable}
+    Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})\n`;
+    
+    message += '\n \n \n'
+  });
+
   
+  return message;
+}
+
+function getSARIFReportMessage(data, vuln, pkg, baseUrl) {
+  let message = `Full image scan results in Sysdig UI: [${data.result.metadata.pullString} scan result](${data.info.resultUrl})\n`;
+
+  if (baseUrl) {
+    message += `Package: [${pkg.name}](${baseUrl}/content?filter=freeText+in+("${pkg.name}"))\n`;
+  } else {
+    message += `Package: ${pkg.name}\n`;
+  }
+  
+  message += `Package type: ${pkg.type}
+  Installed Version: ${pkg.version}
+  Package path: ${pkg.path}\n`;
+
+  if (baseUrl) {
+    message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+("${vuln.name}"))\n`;
+  } else {
+    message += `Vulnerability: ${vuln.name}\n`;
+  }
   message += `Severity: ${vuln.severity.value}
   CVSS Score: ${vuln.cvssScore.value.score}
   CVSS Version: ${vuln.cvssScore.value.version}
   CVSS Vector: ${vuln.cvssScore.value.vector}
   Fixed Version: ${(vuln.fixedInVersion || 'Unknown')}
   Exploitable: ${vuln.exploitable}
-  Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})
-  \n\n\n`;
+  Link to NVD: [${vuln.name}](https://nvd.nist.gov/vuln/detail/${vuln.name})`;
   
   return message;
 }
