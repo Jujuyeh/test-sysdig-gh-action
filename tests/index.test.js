@@ -63,6 +63,8 @@ describe("input parsing", () => {
             "sysdigSecureToken": "token",
             "sysdigSecureURL": `${index.defaultSecureEndpoint}`,
             "sysdigSkipTLS": false,
+            "severityAtLeast": "any",
+            "groupByPackage": false,
             "extraParameters": ""
         })
     })
@@ -84,6 +86,8 @@ describe("input parsing", () => {
         process.env['INPUT_SYSDIG-SECURE-TOKEN'] = "token";
         process.env['INPUT_SYSDIG-SECURE-URL'] = "https://foo";
         process.env['INPUT_SYSDIG-SKIP-TLS'] = "true";
+        process.env['INPUT_SEVERITY-AT-LEAST'] = "medium";
+        process.env['INPUT_GROUP-BY-PACKAGE'] = 'true';
         process.env['INPUT_EXTRA-PARAMETERS'] = "--extra-param";
         let opts = index.parseActionInputs()
 
@@ -104,6 +108,8 @@ describe("input parsing", () => {
             "sysdigSecureToken": "token",
             "sysdigSecureURL": "https://foo",
             "sysdigSkipTLS": true,
+            "severityAtLeast": "medium",
+            "groupByPackage": true,
             "extraParameters": "--extra-param"
         })
     })
