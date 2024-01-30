@@ -73,7 +73,7 @@ jobs:
           sysdig-secure-token: ${{ secrets.KUBELAB_SECURE_API_TOKEN }}
           stop-on-failed-policy-eval: true
           stop-on-processing-error: true
-          severity-at-least: medium
+          severity-at-least: high
           group-by-package: true
 
       - name: Upload SARIF file
