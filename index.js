@@ -608,9 +608,9 @@ function getSARIFPkgHelp(pkg) {
   });
 
   let markdown = `| Vulnerability | Severity | CVSS Score | CVSS Version | CVSS Vector | Exploitable |
-  | -------- | ------- | ---------- | ------------ | -----------  | ----------- |`;
+  | -------- | ------- | ---------- | ------------ | -----------  | ----------- |\n`;
 
-  pkg.vulns.forEach(vuln => {markdown += `| ${vuln.name} | ${vuln.severity.value} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${vuln.exploitable} |` });
+  pkg.vulns.forEach(vuln => {markdown += `| ${vuln.name} | ${vuln.severity.value} | ${vuln.cvssScore.value.score} | ${vuln.cvssScore.value.version} | ${vuln.cvssScore.value.vector} | ${vuln.exploitable} |\n` });
   
   return {
     text: text,
