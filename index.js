@@ -653,7 +653,7 @@ function getSARIFReportMessageByPackage(data, pkg, baseUrl) {
 
   pkg.vulns.forEach(vuln => {
     message += `
-    
+    ---
     `;
     if (baseUrl) {
       message += `Vulnerability: [${vuln.name}](${baseUrl}/vulnerabilities?filter=freeText+in+("${vuln.name}"))\n`;
